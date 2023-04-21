@@ -1,424 +1,597 @@
-#include <SFML/Graphics/RenderWindow.hpp>
-#include <SFML/System/Clock.hpp>
-#include <SFML/Window/Event.hpp>
+#include <iostream>
+#include <ctime>
+#include <cmath>
+#include <vector>
 
-#include <imgui-SFML.h>
-#include <imgui.h>
-#include <fstream>
+#include <SFML/Graphics.hpp>
 
-// первое множество
-static const int SET_1 = 0;
-// второе множество
-static const int SET_2 = 1;
-// пересечение множеств
-static const int SET_CROSSED = 2;
-// разность множеств
-static const int SET_SINGLE = 3;
+using namespace sf;
 
-// Ширина окна
-static const int WINDOW_SIZE_X = 800;
-// Высота окна
-static const int WINDOW_SIZE_Y = 800;
-
-// путь к файлу вывода
-static const char OUTPUT_PATH[255] = "D:/Programming/Files/out.txt";
-// путь к файлу ввода
-static const char INPUT_PATH[255] = "D:/Programming/Files/in.txt";
-
-// Точка
-struct Point {
-    // положение
-    sf::Vector2i pos;
-    // номер множества
-    int setNum;
-
-    // конструктор
-    Point(const sf::Vector2i &pos, int setNum) : pos(pos), setNum(setNum) {
+float abc(float x)
+{
+    if(x < 0)
+    {
+        x = x * (-1);
     }
 
-    // получить случайную точку
-    static Point randomPoint() {
-        return Point(sf::Vector2i(
-                             rand() % WINDOW_SIZE_X,
-                             rand() % WINDOW_SIZE_Y),
-                     rand() % 2
-        );
-    }
-};
-
-// динамический список точек
-std::vector<Point> points;
-
-// цвет фона
-static sf::Color bgColor;
-// значение цвета по умолчанию
-float color[3] = {0.12f, 0.12f, 0.13f};
-
-// буфер, хранящий координаты последней добавленной вершины
-int lastAddPosBuf[2] = {0, 0};
-
-// буфер кол-ва случайных точек
-int lastRandoCntBuf[1] = {10};
-
-
-// задать цвет фона по вещественному массиву компонент
-static void setColor(float *pDouble) {
-    bgColor.r = static_cast<sf::Uint8>(pDouble[0] * 255.f);
-    bgColor.g = static_cast<sf::Uint8>(pDouble[1] * 255.f);
-    bgColor.b = static_cast<sf::Uint8>(pDouble[2] * 255.f);
+    return x;
 }
 
+int main()
+{
+    int deadBalls = 0;
 
-// добавить заданное кол-во случайных точек
-void randomize(int cnt) {
-    for (int i = 0; i < cnt; i++) {
-        points.emplace_back(Point::randomPoint());
-    }
-}
+    float oldRadius = 0;
 
-// запись в файл
-void saveToFile() {
-    // открываем поток данных для записи в файл
-    std::ofstream output(OUTPUT_PATH);
+    int circlesValue;
 
-    // перебираем точки
-    for (auto point: points) {
-        // выводим через пробел построчно: x-координату, y-координату и номер множества
-        output << point.pos.x << " " << point.pos.y << " " << point.setNum << std::endl;
-    }
+    float ENEMIES_SPEED = 0.5;
 
-    // закрываем
-    output.close();
-}
+    std::srand(time(NULL));
 
-// решение задачи
-void solve() {
-    // у совпадающих по координатам точек меняем множество на SET_CROSSED
-    for (int i = 0; i < points.size(); i++)
-        for (int j = i + 1; j < points.size(); j++)
-            if (points[i].pos == points[j].pos)
-                points[i].setNum = points[j].setNum = SET_CROSSED;
+    std::vector <CircleShape> enemies;
 
-    // у всех точек, у которых множество не SET_CROSSED, задаём множество SET_SINGLE
-    for (auto &point: points)
-        if (point.setNum != SET_CROSSED)
-            point.setNum = SET_SINGLE;
+    float time;
 
-}
+    RenderWindow window2(VideoMode(1800, 1000), "Main menu");
 
-// загрузка из файла
-void loadFromFile() {
-    // открываем поток данных для чтения из файла
-    std::ifstream input(INPUT_PATH);
-    // очищаем массив точек
-    points.clear();
-    // пока не достигнут конец файла
-    while (!input.eof()) {
-        int x, y, s;
-        input >> x; // читаем x координату
-        input >> y; // читаем y координату
-        input >> s; // читаем номер множества
-        // добавляем в динамический массив точку на основе прочитанных данных
-        points.emplace_back(Point(sf::Vector2i(x, y), s));
-    }
-    // закрываем файл
-    input.close();
-}
+    RectangleShape rectangle;
+    rectangle.setSize(sf::Vector2f(200, 50));
+    rectangle.setFillColor(Color::Green);
+    rectangle.setPosition(800, 250);
 
-// рисование параметров цвета
-void ShowBackgroundSetting() {
-    // если не раскрыта панель `Background`
-    if (!ImGui::CollapsingHeader("Background"))
-        // заканчиваем выполнение
-        return;
+    RectangleShape rectangle2;
+    rectangle2.setSize(sf::Vector2f(200, 50));
+    rectangle2.setFillColor(Color::Cyan);
+    rectangle2.setPosition(800, 450);
 
-    // Инструмент выбора цвета
-    if (ImGui::ColorEdit3("Background color", color)) {
-        // код вызывается при изменении значения
-        // задаём цвет фона
-        setColor(color);
-    }
-}
+    RectangleShape rectangle3;
+    rectangle3.setSize(sf::Vector2f(200, 50));
+    rectangle3.setFillColor(Color::Red);
+    rectangle3.setPosition(800, 650);
 
-// рисование задачи на невидимом окне во всё окно приложения
-void RenderTask() {
-    // задаём левый верхний край невидимого окна
-    ImGui::SetNextWindowPos(ImVec2(0, 0));
-    // задаём правый нижний край невидимого окна
-    ImGui::SetNextWindowSize(ImVec2(WINDOW_SIZE_X, WINDOW_SIZE_Y));
-    // создаём невидимое окно
-    ImGui::Begin("Overlay", nullptr,
-                 ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
-                 ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoBackground);
-    // получаем список примитивов, которые будут нарисованы
-    auto pDrawList = ImGui::GetWindowDrawList();
+    RectangleShape rectangle4;
+    rectangle4.setSize(sf::Vector2f(200, 50));
+    rectangle4.setFillColor(Color::Yellow);
+    rectangle4.setPosition(800, 850);
 
-    // перебираем точки из динамического массива точек
-    for (auto point: points) {
-        ImColor clr;
-        // Устанавливаем цвет по номеру множества
-        switch (point.setNum) {
-            case SET_1:
-                clr = ImColor(200, 100, 150);
-                break;
-            case SET_2:
-                clr = ImColor(100, 200, 150);
-                break;
-            case SET_CROSSED:
-                clr = ImColor(100, 150, 200);
-                break;
-            case SET_SINGLE:
-                clr = ImColor(150, 200, 100);
-                break;
-        }
-        // добавляем в список рисования круг
-        pDrawList->AddCircleFilled(
-                sf::Vector2i(point.pos.x, point.pos.y),
-                3,
-                clr,
-                20
-        );
-    }
-    // заканчиваем рисование окна
-    ImGui::End();
-}
+    Font f;
+    if(!f.loadFromFile("../../resources/arial.ttf"))
+        return EXIT_FAILURE;
 
-// ручное добавление элементов
-void ShowAddElem() {
-    // если не раскрыта панель `Add Elem`
-    if (!ImGui::CollapsingHeader("Add Elem"))
-        // заканчиваем выполнение
-        return;
+    Text textMainMenu("Main menu", f);
+    textMainMenu.setCharacterSize(50);
+    textMainMenu.setFillColor(Color::Black);
+    textMainMenu.setPosition(780, 60);
 
+    Text textEasy("Easy", f);
+    textEasy.setCharacterSize(30);
+    textEasy.setFillColor(Color::Black);
+    textEasy.setPosition(865, 260);
 
-    // Инструмент выбора цвета
-    if (ImGui::DragInt2("Coords", lastAddPosBuf, 0.5f, 0, std::min(WINDOW_SIZE_X, WINDOW_SIZE_Y))) {
-        // никаких действий не требуется, достаточно
-        // тех изменений буфера, которые imGui выполняет
-        // автоматически
+    Text textMedium("Medium", f);
+    textMedium.setCharacterSize(30);
+    textMedium.setFillColor(Color::Black);
+    textMedium.setPosition(850, 460);
+
+    Text textHard("Hard", f);
+    textHard.setCharacterSize(30);
+    textHard.setFillColor(Color::Black);
+    textHard.setPosition(865, 660);
+
+    Text textInstruction("Instruction", f);
+    textInstruction.setCharacterSize(30);
+    textInstruction.setFillColor(Color::Black);
+    textInstruction.setPosition(830, 860);
+
+    Texture agario;
+    if (!agario.loadFromFile("../../resources/Agario.png"))
+    {
+        return -1;
     }
 
-    // фиксируем id равный 0 для первого элемента
-    ImGui::PushID(0);
-    // если нажата кнопка `Set 1`
-    if (ImGui::Button("Set 1"))
-        // добавляем то добавляем в список точку, принадлежащую первому множеству
-        points.emplace_back(Point(sf::Vector2i(lastAddPosBuf[0], lastAddPosBuf[1]), SET_1));
-    // восстанавливаем буфер id
-    ImGui::PopID();
+    Sprite fone;
+    fone.setTexture(agario);
+    fone.setPosition(1, 1);
+    fone.scale(1.5, 1.5);
 
-    // говорим imGui, что следующий элемент нужно рисовать на той же линии
-    ImGui::SameLine();
-    // задаём id, равный одному
-    ImGui::PushID(1);
-    // если нажата кнопка `Set 2`
-    if (ImGui::Button("Set 2"))
-        // добавляем то добавляем в список точку, принадлежащую второму множеству
-        points.emplace_back(Point(sf::Vector2i(lastAddPosBuf[0], lastAddPosBuf[1]), SET_2));
-    // восстанавливаем буфер id
-    ImGui::PopID();
-}
+    while (window2.isOpen())
+    {
+        Event event;
+        while (window2.pollEvent(event))
+        {
+            if (event.type == Event::Closed)
+                window2.close();
 
-// панель добавления случайных точек
-void ShowRandomize() {
-    // если не раскрыта панель `Randomize`
-    if (!ImGui::CollapsingHeader("Randomize"))
-        // заканчиваем выполнение
-        return;
+            if (event.type == Event::MouseButtonPressed)
+            {
+                if (event.mouseButton.button == Mouse::Left)
+                {
+                    if(rectangle.getGlobalBounds().contains(Mouse::getPosition(window2).x, Mouse::getPosition(window2).y))
+                    {
+                        circlesValue = 5;
+                        time = 10;
 
-    // первый элемент в строке
-    ImGui::PushID(0);
+                        for(int i = 0; i < circlesValue; i++)
+                        {
+                            int xPos = std::rand() % 2;
+                            int yPos = std::rand() % 2;
+                            CircleShape Ball;
+                            Ball.setRadius(5 + std::rand() % 50 * 1.2);
+                            if(xPos == 0)
+                            {
+                                if(yPos == 0)
+                                    Ball.setPosition(10 + std::rand() % 750, 10 + std::rand() % 350);
+                                else
+                                    Ball.setPosition(10 + std::rand() % 750, 500 + std::rand() % 550);
+                            }
+                            else
+                            {
+                                if(yPos == 0)
+                                    Ball.setPosition(950 + std::rand() % 750, 10 + std::rand() % 350);
+                                else
+                                    Ball.setPosition(950 + std::rand() % 750, 500 + std::rand() % 550);
+                            }
+                            Ball.setFillColor(Color::Green);
+                            enemies.push_back(Ball);
+                        }
+                        window2.close();
+                    }
 
-    // Инструмент выбора кол-ва
-    if (ImGui::DragInt("Count", lastRandoCntBuf, 0.1, 0, 100)) {
+                    else  if(rectangle2.getGlobalBounds().contains(Mouse::getPosition(window2).x, Mouse::getPosition(window2).y))
+                    {
+                        circlesValue = 10;
+                        time = 15;
 
-    }
-    // восстанавливаем буфер id
-    ImGui::PopID();
-    // следующий элемент будет на той же строчке
-    ImGui::SameLine();
-    // второй элемент
-    ImGui::PushID(1);
-    // создаём кнопку добавления
-    if (ImGui::Button("Add"))
-        // по клику добавляем заданное число случайных точек
-        randomize(lastRandoCntBuf[0]);
-    ImGui::PopID();
-}
+                        for(int i = 0; i < circlesValue; i++)
+                        {
+                            int xPos = std::rand() % 2;
+                            int yPos = std::rand() % 2;
+                            CircleShape Ball;
+                            Ball.setRadius(5 + std::rand() % 50 * 1.5);
+                            if(xPos == 0)
+                            {
+                                if(yPos == 0)
+                                    Ball.setPosition(10 + std::rand() % 750, 10 + std::rand() % 350);
+                                else
+                                    Ball.setPosition(10 + std::rand() % 750, 500 + std::rand() % 550);
+                            }
+                            else
+                            {
+                                if(yPos == 0)
+                                    Ball.setPosition(950 + std::rand() % 750, 10 + std::rand() % 350);
+                                else
+                                    Ball.setPosition(950 + std::rand() % 750, 500 + std::rand() % 550);
+                            }
+                            Ball.setFillColor(Color::Green);
+                            enemies.push_back(Ball);
+                        }
+                        window2.close();
+                    }
 
+                    else  if(rectangle3.getGlobalBounds().contains(Mouse::getPosition(window2).x, Mouse::getPosition(window2).y))
+                    {
+                        circlesValue = 20;
+                        time = 20;
 
-// работа с файлами
-void ShowFiles() {
-    // если не раскрыта панель `Files`
-    if (!ImGui::CollapsingHeader("Files"))
-        // заканчиваем выполнение
-        return;
+                        for(int i = 0; i < circlesValue; i++)
+                        {
+                            int xPos = std::rand() % 2;
+                            int yPos = std::rand() % 2;
+                            CircleShape Ball;
+                            Ball.setRadius(5 + std::rand() % 50 * 1.8);
+                            if(xPos == 0)
+                            {
+                                if(yPos == 0)
+                                    Ball.setPosition(10 + std::rand() % 750, 10 + std::rand() % 350);
+                                else
+                                    Ball.setPosition(10 + std::rand() % 750, 500 + std::rand() % 550);
+                            }
+                            else
+                            {
+                                if(yPos == 0)
+                                    Ball.setPosition(950 + std::rand() % 750, 10 + std::rand() % 350);
+                                else
+                                    Ball.setPosition(950 + std::rand() % 750, 500 + std::rand() % 550);
+                            }
+                            Ball.setFillColor(Color::Green);
+                            enemies.push_back(Ball);
+                        }
+                        window2.close();
+                    }
+                    else  if(rectangle4.getGlobalBounds().contains(Mouse::getPosition(window2).x, Mouse::getPosition(window2).y))
+                    {
+                        RenderWindow window3(VideoMode(1800, 1000), "Instruction");
 
-    // первый элемент в линии
-    ImGui::PushID(0);
-    // создаём кнопку загрузки
-    if (ImGui::Button("Load")) {
-        // загружаем данные из файла
-        loadFromFile();
-    }
-    // восстанавливаем буфер id
-    ImGui::PopID();
+                        Texture agario;
+                        if (!agario.loadFromFile("../../resources/Agario.png"))
+                        {
+                            return -1;
+                        }
 
-    // следующий элемент будет на той же строчке
-    ImGui::SameLine();
-    // второй элемент
-    ImGui::PushID(1);
-    // создаём кнопку сохранения
-    if (ImGui::Button("Save")) {
-        // сохраняем задачу в файл
-        saveToFile();
-    }
-    // восстанавливаем буфер id
-    ImGui::PopID();
+                        Sprite fone;
+                        fone.setTexture(agario);
+                        fone.setPosition(1, 1);
+                        fone.scale(1.5, 1.5);
 
-}
+                        Text textInstruction("Instruction", f);
+                        textInstruction.setCharacterSize(50);
+                        textInstruction.setFillColor(Color::Black);
+                        textInstruction.setPosition(820, 260);
 
-// решение задачи
-void ShowSolve() {
-    // если не раскрыта панель `Solve`
-    if (!ImGui::CollapsingHeader("Solve"))
-        return;
-    // первый элемент в линии
-    ImGui::PushID(0);
-    // создаём кнопку решения
-    if (ImGui::Button("Solve")) {
-        solve();
-    }
+                        Text textBigInstruction("Tab \"Up\" to move up \n\nTab \"Left\" to move left \n\nTab \"Down\" to move down \n\nTab \"Right\" to move right \n\nTab \"Space\" to come back to main menu", f);
+                        textBigInstruction.setCharacterSize(30);
+                        textBigInstruction.setFillColor(Color::Black);
+                        textBigInstruction.setPosition(750, 600);
 
-    // восстанавливаем буфер id
-    ImGui::PopID();
+                        while (window3.isOpen())
+                        {
+                            Event event;
+                            while (window3.pollEvent(event))
+                            {
+                                if (event.type == Event::Closed)
+                                    window3.close();
 
-    // следующий элемент будет на той же строчке
-    ImGui::SameLine();
-    // второй элемент
-    ImGui::PushID(1);
+                                if(event.type == Event::KeyPressed)
+                                {
+                                    if (event.key.code == Keyboard::Space)
+                                    {
+                                        window3.close();
+                                    }
+                                }
+                                window3.clear(Color::White);
 
-    // создаём кнопку очистки
-    if (ImGui::Button("Clear")) {
-        // удаляем все точки
-        points.clear();
-    }
-    // восстанавливаем буфер id
-    ImGui::PopID();
-}
+                                window3.draw(fone);
 
-// помощь
-void ShowHelp() {
-    if (!ImGui::CollapsingHeader("Help"))
-        return;
+                                window3.draw(textBigInstruction);
+                                window3.draw(textInstruction);
 
-    // первый заголовок
-    ImGui::Text("ABOUT THIS DEMO:");
-    // первый элемент списка
-    ImGui::BulletText("Author Ivanov Ivan 10-1");
-    // второй элемент списка
-    ImGui::BulletText("Powered by SFML+ImGui");
-    // разделитель
-    ImGui::Separator();
-
-    // второй заголовок
-    ImGui::Text("TASK:");
-    // первый элемент списка(многострочный)
-    ImGui::BulletText("Two sets of points are given\n"
-                      "in an integer two-dimensional space.\n"
-                      "It is required to build intersections and\n"
-                      "the difference between these sets.");
-    // разделитель
-    ImGui::Separator();
-
-}
-
-
-// главный метод
-int main() {
-    // создаём окно для рисования
-    sf::RenderWindow window(sf::VideoMode(WINDOW_SIZE_X, WINDOW_SIZE_Y), "Geometry Project 10");
-    // задаём частоту перерисовки окна
-    window.setFramerateLimit(60);
-    // инициализация imgui+sfml
-    ImGui::SFML::Init(window);
-
-    // задаём цвет фона
-    setColor(color);
-
-    // переменная таймера
-    sf::Clock deltaClock;
-    // пока окно открыто, запускаем бесконечный цикл
-    while (window.isOpen()) {
-        // создаём событие sfml
-        sf::Event event;
-        // пока окно принимает события
-        while (window.pollEvent(event)) {
-            // отправляем события на обработку sfml
-            ImGui::SFML::ProcessEvent(event);
-
-            // если событие - это закрытие окна
-            if (event.type == sf::Event::Closed) {
-                // закрываем окно
-                window.close();
+                                window3.display();
+                            }
+                        }
+                    }
+                }
             }
-            // если событие - это клик мышью
-            if (event.type == sf::Event::MouseButtonPressed) {
-                // если мышь не обрабатывается элементами imGui
-                if (!ImGui::GetIO().WantCaptureMouse) {
-                    // меняем координаты последней добавленной точки
-                    lastAddPosBuf[0] = event.mouseButton.x;
-                    lastAddPosBuf[1] = event.mouseButton.y;
-                    // если левая кнопка мыши
-                    if (event.mouseButton.button == sf::Mouse::Button::Left)
-                        points.emplace_back(sf::Vector2i(event.mouseButton.x, event.mouseButton.y), SET_1);
-                    else
-                        points.emplace_back(sf::Vector2i(event.mouseButton.x, event.mouseButton.y), SET_2);
+            window2.clear(Color::White);
+
+            window2.draw(fone);
+
+            window2.draw(rectangle);
+            window2.draw(rectangle2);
+            window2.draw(rectangle3);
+            window2.draw(rectangle4);
+
+            window2.draw(textEasy);
+            window2.draw(textMedium);
+            window2.draw(textHard);
+            window2.draw(textInstruction);
+            window2.draw(textMainMenu);
+
+            window2.display();
+        }
+    }
+
+
+    RenderWindow window(VideoMode(1800, 1000), "Agario");
+
+    View myView = window.getView();
+
+    CircleShape player;
+    player.setRadius(50);
+    player.setPosition(850, 450);
+    player.setFillColor(Color::Cyan);
+
+    Texture fon;
+    if (!fon.loadFromFile("../../resources/background.jpg"))
+    {
+        return -1;
+    }
+
+    Sprite background;
+    background.setTexture(fon);
+
+    background.scale(3.5, 3.3);
+
+    Texture enem;
+    if (!enem.loadFromFile("../../resources/angryball.jpg"))
+    {
+        return -1;
+    }
+
+    Sprite angryball;
+    angryball.setTexture(enem);
+
+    Font font;
+    if(!font.loadFromFile("../../resources/arial.ttf"))
+        return EXIT_FAILURE;
+
+    Text textLose("You lose!", font);
+    textLose.setCharacterSize(18.75);
+    textLose.setFillColor(Color::Red);
+    textLose.setPosition(50, 50);
+
+    Text textWin("You win!", font);
+    textWin.setCharacterSize(18.75);
+    textWin.setFillColor(Color::Green);
+    textWin.setPosition(50, 50);
+
+    Text textScore("Your score is ", font);
+    textScore.setCharacterSize(18.75);
+    textScore.setFillColor(Color::Magenta);
+    textScore.setPosition(textWin.getGlobalBounds().left + textWin.getGlobalBounds().width + 100, 50);
+
+    Text textTime(std::to_string(time), font);
+    textTime.setCharacterSize(18.75);
+    textTime.setFillColor(Color::Black);
+    textTime.setPosition(textScore.getGlobalBounds().left + textScore.getGlobalBounds().width + 300, 50);
+
+
+    Clock timer;
+
+    bool lose = false;
+    bool Up = false;
+    bool Down = false;
+    bool Left = false;
+    bool Right = false;
+
+    int score = 0;
+
+    while(!window.hasFocus())
+    {
+        timer.restart();
+    }
+
+    while (window.isOpen())
+    {
+        Event event;
+        while (window.pollEvent(event))
+        {
+            if (event.type == Event::Closed)
+                window.close();
+
+            if(event.type == Event::KeyPressed)
+            {
+                if (event.key.code == Keyboard::Left)
+                {
+                    Left = true;
+                }
+
+                if (event.key.code == Keyboard::Right)
+                {
+                    Right = true;
+                }
+
+                if (event.key.code == Keyboard::Up)
+                {
+                    Up = true;
+                }
+
+                if (event.key.code == Keyboard::Down)
+                {
+                    Down = true;
+                }
+            }
+
+            if(event.type == Event::KeyReleased)
+            {
+                if (event.key.code == Keyboard::Left)
+                {
+                    Left = false;
+                }
+
+                if (event.key.code == Keyboard::Right)
+                {
+                    Right = false;
+                }
+
+                if (event.key.code == Keyboard::Up)
+                {
+                    Up = false;
+                }
+
+                if (event.key.code == Keyboard::Down)
+                {
+                    Down = false;
                 }
             }
         }
 
-        // запускаем обновление окна по таймеру с заданной частотой
-        ImGui::SFML::Update(window, deltaClock.restart());
+        textScore.setString("Your score is " + std::to_string(score));
+        textTime.setString(std::to_string(time));
 
-        // рисование задания
-        RenderTask();
 
-        // делаем окно полупрозрачным
-        ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.12f, 0.12f, 0.13f, 0.8f));
+        for(int i = 0; i < enemies.size(); i++)
+        {
+            int xplayer = player.getPosition().x + player.getRadius();
+            int yplayer = player.getPosition().y + player.getRadius();
+            int xenemies = enemies[i].getPosition().x + enemies[i].getRadius();
+            int yenemies = enemies[i].getPosition().y + enemies[i].getRadius();
+            int xDistance = xplayer - xenemies;
+            int yDistance = yplayer - yenemies;
+            int Distance = xDistance * xDistance + yDistance * yDistance;
+            if(std::sqrt(Distance) < player.getRadius() + enemies[i].getRadius() && player.getRadius() > enemies[i].getRadius())
+            {
+                oldRadius = player.getRadius();
+                player.setRadius(oldRadius + enemies[i].getRadius() / 2);
+                score = score + enemies[i].getRadius() / 5;
+                enemies.erase(enemies.begin() + i);
+                deadBalls = deadBalls + 1;
 
-        // создаём окно управления
-        ImGui::Begin("Control");
+                myView.zoom((player.getRadius() - oldRadius) / player.getRadius() + 1);
 
-        // рисование параметров цвета
-        ShowBackgroundSetting();
-        // ручное добавление элементов
-        ShowAddElem();
-        // добавление случайных точек
-        ShowRandomize();
-        // работа с файлами
-        ShowFiles();
-        // решение задачи
-        ShowSolve();
-        // помощь
-        ShowHelp();
+                background.scale(1 + ((player.getRadius() - oldRadius) / player.getRadius()) * 1.05,
+                                 1 + ((player.getRadius() - oldRadius) / player.getRadius()) * 1.05);
 
-        // конец рисования окна
-        ImGui::End();
+                textLose.setCharacterSize(player.getRadius() * 0.375);
+                textWin.setCharacterSize(player.getRadius() * 0.375);
+                textScore.setCharacterSize(player.getRadius() * 0.375);
+                textTime.setCharacterSize(player.getRadius() * 0.375);
+                textScore.setPosition(textWin.getGlobalBounds().left + textWin.getGlobalBounds().width + 100, 50);
+                textTime.setPosition(textScore.getGlobalBounds().left + textScore.getGlobalBounds().width + 300, 50);
+            }
+        }
 
-        // Возвращаем цвет окна к исходному
-        ImGui::PopStyleColor();
 
-        // очищаем окно
-        window.clear(bgColor);
-        // рисуем по окну средствами imgui+sfml
-        ImGui::SFML::Render(window);
-        // отображаем изменения на окне
+        for(int i = 0; i < enemies.size(); i++)
+        {
+            int xplayer = player.getPosition().x + player.getRadius();
+            int yplayer = player.getPosition().y + player.getRadius();
+            int xenemies = enemies[i].getPosition().x + enemies[i].getRadius();
+            int yenemies = enemies[i].getPosition().y + enemies[i].getRadius();
+            int xDistance = xplayer - xenemies;
+            int yDistance = yplayer - yenemies;
+            int Distance = xDistance * xDistance + yDistance * yDistance;
+            if(std::sqrt(Distance) < player.getRadius() + enemies[i].getRadius() && player.getRadius() < enemies[i].getRadius())
+            {
+                player.setRadius(0);
+                lose = true;
+            }
+        }
+
+
+        for(int i = 0; i < enemies.size(); i++)
+        {
+            if(enemies[i].getRadius() < player.getRadius())
+            {
+                int xplayer = player.getPosition().x + player.getRadius();
+                int yplayer = player.getPosition().y + player.getRadius();
+                int xenemies = enemies[i].getPosition().x + enemies[i].getRadius();
+                int yenemies = enemies[i].getPosition().y + enemies[i].getRadius();
+                float xDistance = -1 * (xplayer - xenemies);
+                float yDistance = -1 * (yplayer - yenemies);
+
+                xDistance = ENEMIES_SPEED * xDistance / std::sqrt(xDistance * xDistance + yDistance * yDistance);
+                yDistance = ENEMIES_SPEED * yDistance / std::sqrt(xDistance * xDistance + yDistance * yDistance);
+
+                float xDistance2 = (900 - xenemies) / 630;
+                float yDistance2 = (500 - yenemies) / 350;
+
+                float xDist = xDistance + xDistance2;
+                float yDist = yDistance + yDistance2;
+
+                if(lose)
+                {
+                    xDist = 0;
+                    yDist = 0;
+                }
+
+                enemies[i].move(xDist, yDist);
+            }
+
+            else
+            {
+                int xplayer = player.getPosition().x + player.getRadius();
+                int yplayer = player.getPosition().y + player.getRadius();
+                int xenemies = enemies[i].getPosition().x + enemies[i].getRadius();
+                int yenemies = enemies[i].getPosition().y + enemies[i].getRadius();
+                float xDistance = xplayer - xenemies;
+                float yDistance = yplayer - yenemies;
+
+                if(lose)
+                {
+                    ENEMIES_SPEED = 0;
+                }
+
+                xDistance = ENEMIES_SPEED * xDistance / std::sqrt(xDistance * xDistance + yDistance * yDistance);
+                yDistance = ENEMIES_SPEED * yDistance / std::sqrt(xDistance * xDistance + yDistance * yDistance);
+
+                enemies[i].move(xDistance, yDistance);
+            }
+
+            if(enemies[i].getPosition().x > 1800)
+            {
+                enemies[i].setPosition(0 - enemies[i].getRadius(), enemies[i].getPosition().y - enemies[i].getRadius());
+            }
+            else if(enemies[i].getPosition().x < 0)
+            {
+                enemies[i].setPosition(1800 - enemies[i].getRadius(), enemies[i].getPosition().y - enemies[i].getRadius());
+            }
+
+            if(enemies[i].getPosition().y > 1000)
+            {
+                enemies[i].setPosition(0 - enemies[i].getRadius(), enemies[i].getPosition().x - enemies[i].getRadius());
+            }
+            else if(enemies[i].getPosition().y < 0)
+            {
+                enemies[i].setPosition(1000 - enemies[i].getRadius(), enemies[i].getPosition().x - enemies[i].getRadius());
+            }
+        }
+
+        if(lose)
+        {
+            Up = false;
+            Down = false;
+            Left = false;
+            Right = false;
+        }
+
+        if(Up)
+        {
+            player.move(0, -2);
+        }
+
+        if(Down)
+        {
+            player.move(0, 2);
+        }
+
+        if(Left)
+        {
+            player.move(-2, 0);
+        }
+
+        if(Right)
+        {
+            player.move(2, 0);
+        }
+        background.setPosition(player.getPosition().x - myView.getSize().x / 2,player.getPosition().y - myView.getSize().y / 2);
+
+        time = time - timer.getElapsedTime().asSeconds();
+        timer.restart();
+
+        if(time < 0)
+        {
+            lose = true;
+        }
+
+        myView.setCenter(player.getPosition().x + player.getRadius(), player.getPosition().y + player.getRadius());
+
+
+        window.clear(Color::White);
+
+        window.draw(background);
+
+        window.draw(player);
+
+        if(deadBalls == circlesValue)
+        {
+            if(!lose)
+            {
+                time = 100;
+                window.draw(textWin);
+                textScore.setFillColor(Color::Green);
+            }
+        }
+
+        if(lose)
+        {
+            time = 0;
+            window.draw(textLose);
+            textScore.setFillColor(Color::Red);
+        }
+
+        for(int i = 0; i < enemies.size(); i ++)
+        {
+            window.draw(enemies[i]);
+        }
+
+        window.draw(textScore);
+
+        window.draw(textTime);
+
+        window.setView(myView);
+
         window.display();
+
     }
-
-    // завершаем работу imgui+sfml
-    ImGui::SFML::Shutdown();
-
-    return 0;
 }
