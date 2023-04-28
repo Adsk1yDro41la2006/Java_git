@@ -2,6 +2,10 @@ add_executable(example main.cpp)
 target_link_libraries(example PRIVATE ImGui-SFML::ImGui-SFML)
 
 
+add_executable(prototype Prototip.cpp)
+target_link_libraries(prototype PRIVATE ImGui-SFML::ImGui-SFML)
+
+
 # Copy DLLs needed for runtime on Windows
 if(WIN32)
     if (BUILD_SHARED_LIBS)
