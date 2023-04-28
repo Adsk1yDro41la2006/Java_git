@@ -6,6 +6,7 @@
 #include <SFML/Graphics.hpp>
 
 using namespace sf;
+using namespace std;
 
 float abc(float x)
 {
@@ -107,10 +108,11 @@ int main()
             {
                 if (event.mouseButton.button == Mouse::Left)
                 {
+                    sleep(milliseconds(1000));
                     if(rectangle.getGlobalBounds().contains(Mouse::getPosition(window2).x, Mouse::getPosition(window2).y))
                     {
                         circlesValue = 5;
-                        time = 10;
+                        time = 15;
 
                         for(int i = 0; i < circlesValue; i++)
                         {
@@ -141,7 +143,7 @@ int main()
                     else  if(rectangle2.getGlobalBounds().contains(Mouse::getPosition(window2).x, Mouse::getPosition(window2).y))
                     {
                         circlesValue = 10;
-                        time = 15;
+                        time = 17;
 
                         for(int i = 0; i < circlesValue; i++)
                         {
@@ -396,6 +398,8 @@ int main()
             }
         }
 
+        textScore.setPosition(player.getPosition().x  + 200 ,player.getPosition().y - 300);
+        textTime.setPosition(player.getPosition().x - 300 ,player.getPosition().y - 300);
         textScore.setString("Your score is " + std::to_string(score));
         textTime.setString(std::to_string(time));
 
